@@ -7,6 +7,7 @@ import { ScrollArea } from '@/components/ui/scroll-area';
 import { ArrowLeft, Send, Loader2 } from 'lucide-react';
 import { streamAgentResponse } from '@/lib/api';
 import { MarkdownContent } from '@/components/MarkdownContent';
+import { generateUUID } from '@/lib/utils';
 
 interface Message {
   role: 'user' | 'assistant';
@@ -22,7 +23,7 @@ export function ChatInterface({ vaultId, onBack }: ChatInterfaceProps) {
   const [messages, setMessages] = useState<Message[]>([]);
   const [input, setInput] = useState('');
   const [isLoading, setIsLoading] = useState(false);
-  const [threadId] = useState(() => crypto.randomUUID());
+  const [threadId] = useState(() => generateUUID());
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const scrollContainerRef = useRef<HTMLDivElement>(null);
   const [isStreaming, setIsStreaming] = useState(false);
