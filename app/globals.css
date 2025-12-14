@@ -1,0 +1,94 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    /* GitHub Dark Theme */
+    --background: 220 13% 9%;
+    --foreground: 213 31% 91%;
+
+    --card: 220 13% 11%;
+    --card-foreground: 213 31% 91%;
+
+    --popover: 220 13% 11%;
+    --popover-foreground: 213 31% 91%;
+
+    --primary: 263 90% 51%;
+    --primary-foreground: 210 40% 98%;
+
+    --secondary: 215 14% 16%;
+    --secondary-foreground: 213 31% 91%;
+
+    --muted: 215 14% 16%;
+    --muted-foreground: 220 9% 46%;
+
+    --accent: 215 14% 16%;
+    --accent-foreground: 213 31% 91%;
+
+    --destructive: 0 63% 51%;
+    --destructive-foreground: 210 40% 98%;
+
+    --border: 215 14% 20%;
+    --input: 215 14% 20%;
+    --ring: 263 90% 51%;
+
+    --radius: 0.5rem;
+  }
+}
+
+@layer base {
+  * {
+    @apply border-border;
+  }
+
+  body {
+    @apply bg-background text-foreground;
+    font-feature-settings: "cv02", "cv03", "cv04", "cv11";
+  }
+
+  /* Scrollbar styling */
+  ::-webkit-scrollbar {
+    width: 10px;
+    height: 10px;
+  }
+
+  ::-webkit-scrollbar-track {
+    background: hsl(var(--background));
+  }
+
+  ::-webkit-scrollbar-thumb {
+    background: hsl(var(--muted));
+    border-radius: 5px;
+  }
+
+  ::-webkit-scrollbar-thumb:hover {
+    background: hsl(var(--muted-foreground));
+  }
+
+  /* Markdown content styling */
+  .markdown-content {
+    @apply text-foreground;
+  }
+
+  .markdown-content p:last-child {
+    @apply mb-0;
+  }
+
+  .markdown-content code {
+    font-family: 'Menlo', 'Monaco', 'Courier New', monospace;
+  }
+
+  /* KaTeX formulas styling */
+  .katex {
+    font-size: 1.05em;
+  }
+
+  .katex-display {
+    @apply my-4 overflow-x-auto;
+  }
+
+  .katex-display > .katex {
+    @apply text-left;
+  }
+}
