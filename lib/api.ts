@@ -34,10 +34,12 @@ export async function fetchVaults(): Promise<Vault[]> {
 
 export async function uploadVault(
   file: File,
+  vaultName: string,
   onProgress: (progress: UploadProgress) => void
 ): Promise<string> {
   const formData = new FormData();
   formData.append('file', file);
+  formData.append('vault_name', vaultName);
   formData.append('chunk_size', '500');
 
   const response = await fetch(`${API_BASE_URL}/upload/stream`, {

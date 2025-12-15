@@ -5,7 +5,7 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Upload, FileArchive } from 'lucide-react';
 import { VaultsList } from '@/components/VaultsList';
-import { UploadProgress } from '@/components/UploadProgress';
+import { UploadDialog } from '@/components/UploadDialog';
 import { ChatInterface } from '@/components/ChatInterface';
 import { fetchVaults, uploadVault, type Vault, type UploadProgress as UploadProgressType } from '@/lib/api';
 
@@ -18,6 +18,7 @@ export default function Home() {
   const [isUploading, setIsUploading] = useState(false);
   const [uploadProgress, setUploadProgress] = useState<UploadProgressType | null>(null);
   const [isDragging, setIsDragging] = useState(false);
+  const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
@@ -34,17 +35,21 @@ export default function Home() {
     }
   };
 
-  const handleFileSelect = async (file: File) => {
+  const handleFileSelect = (file: File) => {
     if (!file.name.endsWith('.zip')) {
       alert('Пожалуйста, загрузите .zip файл');
       return;
     }
 
+    setSelectedFile(file);
+  };
+
+  const handleUploadConfirm = async (file: File, vaultName: string) => {
     setIsUploading(true);
     setUploadProgress(null);
 
     try {
-      const vaultId = await uploadVault(file, (progress) => {
+      const vaultId = await uploadVault(file, vaultName, (progress) => {
         setUploadProgress(progress);
       });
 
@@ -53,6 +58,7 @@ export default function Home() {
         setTimeout(() => {
           setIsUploading(false);
           setUploadProgress(null);
+          setSelectedFile(null);
         }, 2000);
       }
     } catch (error) {
@@ -65,6 +71,12 @@ export default function Home() {
         error: error instanceof Error ? error.message : 'Unknown error',
       });
     }
+  };
+
+  const handleCancelUpload = () => {
+    setSelectedFile(null);
+    setIsUploading(false);
+    setUploadProgress(null);
   };
 
   const handleDrop = (e: React.DragEvent) => {
@@ -101,15 +113,25 @@ export default function Home() {
   }
 
   return (
-    <div
-      className={`min-h-screen p-8 transition-colors ${
-        isDragging ? 'bg-primary/10' : 'bg-background'
-      }`}
-      onDrop={handleDrop}
-      onDragOver={handleDragOver}
-      onDragLeave={handleDragLeave}
-    >
-      <div className="max-w-6xl mx-auto space-y-8">
+    <>
+      {selectedFile && (
+        <UploadDialog
+          file={selectedFile}
+          onCancel={handleCancelUpload}
+          onUpload={handleUploadConfirm}
+          uploadProgress={uploadProgress}
+          isUploading={isUploading}
+        />
+      )}
+      <div
+        className={`min-h-screen p-8 transition-colors ${
+          isDragging ? 'bg-primary/10' : 'bg-background'
+        }`}
+        onDrop={handleDrop}
+        onDragOver={handleDragOver}
+        onDragLeave={handleDragLeave}
+      >
+        <div className="max-w-6xl mx-auto space-y-8">
         {/* Header */}
         <div className="flex items-center justify-between border-b border-border pb-6">
           <div>
@@ -155,13 +177,8 @@ export default function Home() {
           </Card>
         )}
 
-        {/* Upload progress */}
-        {isUploading && uploadProgress && (
-          <UploadProgress progress={uploadProgress} />
-        )}
-
         {/* Vaults list */}
-        {!isUploading && (
+        {!selectedFile && (
           <div className="space-y-4">
             <div>
               <h2 className="text-xl font-semibold tracking-tight">
@@ -176,7 +193,7 @@ export default function Home() {
         )}
 
         {/* Empty state */}
-        {!isDragging && !isUploading && vaults.length === 0 && (
+        {!isDragging && !selectedFile && vaults.length === 0 && (
           <Card className="border-dashed border-2">
             <CardHeader className="text-center">
               <CardTitle className="text-2xl">Начните работу</CardTitle>
@@ -190,7 +207,8 @@ export default function Home() {
             </CardContent>
           </Card>
         )}
+        </div>
       </div>
-    </div>
+    </>
   );
 }
