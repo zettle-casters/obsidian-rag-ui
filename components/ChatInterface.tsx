@@ -7,11 +7,13 @@ import { ScrollArea } from '@/components/ui/scroll-area';
 import { ArrowLeft, Send, Loader2 } from 'lucide-react';
 import { streamAgentResponse } from '@/lib/api';
 import { MarkdownContent } from '@/components/MarkdownContent';
+import { ThinkingBlock, NodeEvent } from '@/components/ThinkingBlock';
 import { generateUUID } from '@/lib/utils';
 
 interface Message {
   role: 'user' | 'assistant';
   content: string;
+  thinkingNodes?: NodeEvent[];
 }
 
 interface ChatInterfaceProps {
@@ -62,29 +64,79 @@ export function ChatInterface({ vaultId, onBack }: ChatInterfaceProps) {
     setMessages((prev) => [...prev, userMessage]);
     setInput('');
     setIsLoading(true);
-    
+
     // Scroll to show the user message immediately
     setTimeout(() => {
       scrollToBottom();
     }, 50);
 
     let assistantContent = '';
-    const assistantMessage: Message = { role: 'assistant', content: '' };
+    let thinkingNodes: NodeEvent[] = [];
+    let isGeneratingAnswer = false;
+
+    const assistantMessage: Message = {
+      role: 'assistant',
+      content: '',
+      thinkingNodes: []
+    };
     setMessages((prev) => [...prev, assistantMessage]);
     setIsStreaming(true); // Start streaming - no auto-scroll during streaming
 
     try {
       for await (const event of streamAgentResponse(input, vaultId, threadId)) {
-        if (event.type === 'token') {
-          assistantContent += event.content;
+        if (event.type === 'node_start') {
+          // Нода начала работу
+          const newNode: NodeEvent = {
+            node: event.node,
+            status: 'running',
+          };
+          thinkingNodes = [...thinkingNodes, newNode];
+
+          // Проверяем, началась ли генерация ответа
+          if (event.node === 'generate_answer') {
+            isGeneratingAnswer = true;
+          }
+
           setMessages((prev) => {
             const newMessages = [...prev];
             newMessages[newMessages.length - 1] = {
               role: 'assistant',
               content: assistantContent,
+              thinkingNodes: thinkingNodes,
             };
             return newMessages;
           });
+        } else if (event.type === 'node_complete') {
+          // Нода завершила работу
+          thinkingNodes = thinkingNodes.map((node) =>
+            node.node === event.node && node.status === 'running'
+              ? { ...node, status: 'completed' as const }
+              : node
+          );
+
+          setMessages((prev) => {
+            const newMessages = [...prev];
+            newMessages[newMessages.length - 1] = {
+              role: 'assistant',
+              content: assistantContent,
+              thinkingNodes: thinkingNodes,
+            };
+            return newMessages;
+          });
+        } else if (event.type === 'token') {
+          // Токены от LLM приходят только после начала generate_answer
+          if (isGeneratingAnswer) {
+            assistantContent += event.content;
+            setMessages((prev) => {
+              const newMessages = [...prev];
+              newMessages[newMessages.length - 1] = {
+                role: 'assistant',
+                content: assistantContent,
+                thinkingNodes: thinkingNodes,
+              };
+              return newMessages;
+            });
+          }
         } else if (event.status === 'complete') {
           // Stream complete
         }
@@ -96,6 +148,7 @@ export function ChatInterface({ vaultId, onBack }: ChatInterfaceProps) {
         newMessages[newMessages.length - 1] = {
           role: 'assistant',
           content: 'Произошла ошибка при обработке запроса.',
+          thinkingNodes: thinkingNodes,
         };
         return newMessages;
       });
@@ -149,39 +202,37 @@ export function ChatInterface({ vaultId, onBack }: ChatInterfaceProps) {
             )}
 
             {messages.map((message, index) => (
-              <div
-                key={index}
-                className={`flex ${
-                  message.role === 'user' ? 'justify-end' : 'justify-start'
-                }`}
-              >
-                <div
-                  className={`max-w-[85%] rounded-lg px-5 py-3 ${
-                    message.role === 'user'
-                      ? 'bg-primary text-primary-foreground shadow-sm'
-                      : 'bg-card border border-border shadow-sm'
-                  }`}
-                >
-                  {message.role === 'user' ? (
-                    <p className="text-sm leading-relaxed whitespace-pre-wrap break-words">
-                      {message.content}
-                    </p>
-                  ) : (
-                    <div className="text-sm">
-                      <MarkdownContent content={message.content} />
+              <div key={index}>
+                {message.role === 'user' ? (
+                  <div className="flex justify-end">
+                    <div className="max-w-[85%] rounded-lg px-5 py-3 bg-primary text-primary-foreground shadow-sm">
+                      <p className="text-sm leading-relaxed whitespace-pre-wrap break-words">
+                        {message.content}
+                      </p>
                     </div>
-                  )}
-                </div>
+                  </div>
+                ) : (
+                  <div className="flex flex-col items-start gap-3">
+                    {/* Thinking Block */}
+                    {message.thinkingNodes && message.thinkingNodes.length > 0 && (
+                      <ThinkingBlock
+                        nodes={message.thinkingNodes}
+                        isThinking={isLoading && index === messages.length - 1}
+                      />
+                    )}
+
+                    {/* Assistant Message */}
+                    {message.content && (
+                      <div className="max-w-[85%] rounded-lg px-5 py-3 bg-card border border-border shadow-sm">
+                        <div className="text-sm">
+                          <MarkdownContent content={message.content} />
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                )}
               </div>
             ))}
-
-            {isLoading && messages[messages.length - 1]?.role === 'user' && (
-              <div className="flex justify-start">
-                <div className="max-w-[85%] rounded-lg px-5 py-3 bg-card border border-border shadow-sm">
-                  <Loader2 className="w-4 h-4 animate-spin text-primary" />
-                </div>
-              </div>
-            )}
 
             <div ref={messagesEndRef} />
           </div>
