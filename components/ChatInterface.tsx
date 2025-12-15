@@ -212,7 +212,7 @@ export function ChatInterface({ vaultId, onBack }: ChatInterfaceProps) {
                     </div>
                   </div>
                 ) : (
-                  <div className="flex flex-col items-start gap-3">
+                  <div className="flex flex-col items-start gap-2 w-full">
                     {/* Thinking Block */}
                     {message.thinkingNodes && message.thinkingNodes.length > 0 && (
                       <ThinkingBlock
