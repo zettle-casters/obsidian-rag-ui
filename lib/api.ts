@@ -165,3 +165,59 @@ export async function* streamAgentResponse(
     reader.releaseLock();
   }
 }
+
+export async function* streamTestRun(): AsyncGenerator<any> {
+  const response = await fetch(`${API_BASE_URL}/tests/run`, {
+    method: 'POST',
+  });
+
+  if (!response.ok) {
+    throw new Error('Failed to start tests');
+  }
+
+  const reader = response.body?.getReader();
+  const decoder = new TextDecoder();
+
+  if (!reader) {
+    throw new Error('No response body');
+  }
+
+  try {
+    let buffer = '';
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+
+      buffer += decoder.decode(value, { stream: true });
+      const lines = buffer.split('\n');
+      buffer = lines.pop() || '';
+
+      for (const line of lines) {
+        if (line.startsWith('data: ')) {
+          try {
+            const jsonStr = line.slice(6);
+            if (jsonStr.trim()) {
+              const data = JSON.parse(jsonStr);
+              yield data;
+            }
+          } catch (e) {
+            console.error('Failed to parse test SSE data:', line, e);
+          }
+        }
+      }
+    }
+  } finally {
+    reader.releaseLock();
+  }
+}
+
+export async function fetchTestResults(): Promise<any> {
+  const response = await fetch(`${API_BASE_URL}/tests/results`);
+  if (!response.ok) {
+    if (response.status === 404) {
+      return null;
+    }
+    throw new Error('Failed to fetch test results');
+  }
+  return await response.json();
+}

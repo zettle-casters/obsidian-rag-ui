@@ -3,13 +3,14 @@
 import { useState, useEffect, useRef } from 'react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Upload, FileArchive } from 'lucide-react';
+import { Upload, FileArchive, FlaskConical } from 'lucide-react';
 import { VaultsList } from '@/components/VaultsList';
 import { UploadDialog } from '@/components/UploadDialog';
 import { ChatInterface } from '@/components/ChatInterface';
+import TestInterface from '@/components/TestInterface';
 import { fetchVaults, uploadVault, type Vault, type UploadProgress as UploadProgressType } from '@/lib/api';
 
-type View = 'vaults' | 'chat';
+type View = 'vaults' | 'chat' | 'tests';
 
 export default function Home() {
   const [view, setView] = useState<View>('vaults');
@@ -112,6 +113,31 @@ export default function Home() {
     return <ChatInterface vaultId={selectedVault} onBack={handleBackToVaults} />;
   }
 
+  if (view === 'tests') {
+    return (
+      <div className="min-h-screen bg-background">
+        <div className="border-b border-border">
+          <div className="max-w-6xl mx-auto px-8 py-6">
+            <div className="flex items-center justify-between">
+              <div>
+                <h1 className="text-3xl font-bold tracking-tight">Тесты LLM</h1>
+                <p className="text-muted-foreground mt-2 text-base">
+                  Проверка корректности работы функций check_relevance и should_extend_context
+                </p>
+              </div>
+              <Button onClick={() => setView('vaults')} variant="outline">
+                Назад к хранилищам
+              </Button>
+            </div>
+          </div>
+        </div>
+        <div className="max-w-6xl mx-auto">
+          <TestInterface />
+        </div>
+      </div>
+    );
+  }
+
   return (
     <>
       {selectedFile && (
@@ -141,7 +167,16 @@ export default function Home() {
             </p>
           </div>
 
-          <div>
+          <div className="flex gap-3">
+            <Button
+              onClick={() => setView('tests')}
+              variant="outline"
+              className="gap-2 font-medium"
+              size="lg"
+            >
+              <FlaskConical className="w-4 h-4" />
+              Тесты
+            </Button>
             <input
               ref={fileInputRef}
               type="file"
