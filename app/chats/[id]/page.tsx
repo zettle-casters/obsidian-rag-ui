@@ -44,7 +44,7 @@ export default function ChatDetailPage() {
   const initialMessages = useMemo(() => {
     if (!detail?.messages) return [];
     return detail.messages.map((message) => {
-      const role = (message.role === 'assistant' ? 'assistant' : 'user') as const;
+      const role: 'assistant' | 'user' = message.role === 'assistant' ? 'assistant' : 'user';
       return { role, content: message.content };
     });
   }, [detail]);
