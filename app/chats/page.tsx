@@ -221,14 +221,14 @@ export default function ChatsPage() {
               <CardHeader className="pb-3">
                 <div className="flex flex-wrap items-center justify-between gap-3">
                   <div className="flex items-center gap-3">
-                    {modelBySystem.get(chat.model_name || '')?.avatar_url ? (
-                      // eslint-disable-next-line @next/next/no-img-element
-                      <img
-                        src={modelBySystem.get(chat.model_name || '')?.avatar_url}
-                        alt={modelBySystem.get(chat.model_name || '')?.display_name}
-                        className="h-10 w-10 rounded-full border"
-                      />
-                    ) : (
+                      {modelBySystem.get(chat.model_name || '')?.avatar_url ? (
+                        // eslint-disable-next-line @next/next/no-img-element
+                        <img
+                          src={modelBySystem.get(chat.model_name || '')?.avatar_url || ''}
+                          alt={modelBySystem.get(chat.model_name || '')?.display_name || 'model'}
+                          className="h-10 w-10 rounded-full border"
+                        />
+                      ) : (
                       <div className="h-10 w-10 rounded-full bg-muted" />
                     )}
                     <div>
