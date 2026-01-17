@@ -2,9 +2,6 @@
 
 import { useEffect, useMemo, useState } from 'react';
 import { useParams, useRouter } from 'next/navigation';
-import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Input } from '@/components/ui/input';
 import { ChatInterface } from '@/components/ChatInterface';
 import {
   fetchChat,
@@ -82,18 +79,37 @@ export default function ChatDetailPage() {
     };
   }, [chatId]);
 
-  const handleSave = async () => {
+  const handleTitleCommit = async (nextTitle: string) => {
     if (!detail) return;
+    setTitle(nextTitle);
     setSaving(true);
     try {
-      const updated = await updateChat(detail.chat.id, {
-        title,
-        vault_id: vaultId,
-        model_name: modelName || undefined,
-      });
+      const updated = await updateChat(detail.chat.id, { title: nextTitle });
       setDetail({ ...detail, chat: updated });
-    } catch (error) {
-      console.error('Failed to update chat:', error);
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const handleVaultChange = async (nextVaultId: string) => {
+    if (!detail) return;
+    setVaultId(nextVaultId);
+    setSaving(true);
+    try {
+      const updated = await updateChat(detail.chat.id, { vault_id: nextVaultId });
+      setDetail({ ...detail, chat: updated });
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const handleModelChange = async (nextModel: string) => {
+    if (!detail) return;
+    setModelName(nextModel);
+    setSaving(true);
+    try {
+      const updated = await updateChat(detail.chat.id, { model_name: nextModel });
+      setDetail({ ...detail, chat: updated });
     } finally {
       setSaving(false);
     }
@@ -143,99 +159,28 @@ export default function ChatDetailPage() {
 
   return (
     <div className="min-h-screen bg-background">
-      <div className="border-b border-border">
-        <div className="max-w-6xl mx-auto px-8 py-6 space-y-4">
-          <div className="flex flex-wrap items-center justify-between gap-4">
-            <div>
-              <h1 className="text-3xl font-bold tracking-tight">{detail.chat.title}</h1>
-              <p className="text-muted-foreground mt-2 text-sm">
-                Последнее обновление: {formatDate(detail.chat.updated_at)}
-              </p>
-            </div>
-            <div className="flex items-center gap-3">
-              <Button variant="outline" onClick={() => router.push('/chats')}>
-                Назад к чатам
-              </Button>
-              <Button onClick={handleSave} disabled={saving}>
-                {saving ? 'Сохранение...' : 'Сохранить'}
-              </Button>
-            </div>
-          </div>
-          <Card>
-            <CardContent className="grid gap-4 py-6 md:grid-cols-3">
-              <div className="space-y-2">
-                <label className="text-sm font-medium text-muted-foreground">Название</label>
-                <Input value={title} onChange={(event) => setTitle(event.target.value)} />
-              </div>
-              <div className="space-y-2">
-                <label className="text-sm font-medium text-muted-foreground">Хранилище</label>
-                <select
-                  value={vaultId}
-                  onChange={(event) => setVaultId(event.target.value)}
-                  className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
-                >
-                  {vaults.map((vault) => (
-                    <option key={vault.vault_id} value={vault.vault_id}>
-                      {vault.name}
-                    </option>
-                  ))}
-                </select>
-              </div>
-              <div className="space-y-2">
-                <label className="text-sm font-medium text-muted-foreground">Модель</label>
-                <div className="flex items-center gap-3">
-                  <select
-                    value={modelName}
-                    onChange={(event) => setModelName(event.target.value)}
-                    className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
-                  >
-                    {models.map((model) => (
-                      <option key={model.id} value={model.system_name}>
-                        {model.display_name}
-                      </option>
-                    ))}
-                  </select>
-                  {selectedModel?.avatar_url ? (
-                    // eslint-disable-next-line @next/next/no-img-element
-                    <img src={selectedModel.avatar_url} alt={selectedModel.display_name} className="h-10 w-10 rounded-full border" />
-                  ) : (
-                    <div className="h-10 w-10 rounded-full bg-muted" />
-                  )}
-                </div>
-              </div>
-              <div className="md:col-span-3 flex flex-wrap items-center gap-3 rounded-lg border border-border/60 bg-muted/40 px-4 py-3">
-                <div className="flex-1 text-sm">
-                  {detail.chat.is_shared ? 'Чат опубликован (только чтение).' : 'Чат приватный.'}
-                </div>
-                {detail.chat.is_shared && detail.chat.share_url && (
-                  <Button variant="outline" size="sm" onClick={copyShareLink}>
-                    Скопировать ссылку
-                  </Button>
-                )}
-                <Button
-                  size="sm"
-                  variant={detail.chat.is_shared ? 'destructive' : 'default'}
-                  onClick={handleToggleShare}
-                  disabled={shareLoading}
-                >
-                  {detail.chat.is_shared ? 'Отключить шэринг' : 'Поделиться'}
-                </Button>
-                {shareError && <span className="text-xs text-destructive">{shareError}</span>}
-              </div>
-            </CardContent>
-          </Card>
-        </div>
-      </div>
-
       <ChatInterface
         vaultId={detail.chat.vault_id}
         chatId={detail.chat.id}
         threadId={detail.chat.thread_id}
         title={detail.chat.title}
+        subtitle={`Последнее обновление: ${formatDate(detail.chat.updated_at)}`}
         modelName={detail.chat.model_name || modelName}
         modelDisplayName={selectedModel?.display_name}
         modelAvatarUrl={selectedModel?.avatar_url || undefined}
+        vaultOptions={vaults}
+        modelOptions={models}
         initialMessages={initialMessages}
+        shareState={{
+          isShared: detail.chat.is_shared,
+          shareUrl: detail.chat.share_url,
+        }}
+        savingLabel={saving ? 'Сохранение...' : null}
+        onTitleCommit={handleTitleCommit}
+        onVaultChange={handleVaultChange}
+        onModelChange={handleModelChange}
+        onShareToggle={handleToggleShare}
+        onShareCopy={copyShareLink}
         onBack={() => router.push('/chats')}
       />
     </div>

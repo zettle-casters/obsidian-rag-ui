@@ -3,12 +3,15 @@
 import { useState, useRef, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
+import { Input } from '@/components/ui/input';
 import { ScrollArea } from '@/components/ui/scroll-area';
-import { ArrowLeft, Send, Loader2 } from 'lucide-react';
+import { ArrowLeft, Loader2, MoreVertical, Send } from 'lucide-react';
 import { appendChatMessage, createChat, streamAgentResponse } from '@/lib/api';
 import { MarkdownContent } from '@/components/MarkdownContent';
 import { ThinkingBlock, NodeEvent } from '@/components/ThinkingBlock';
 import { generateUUID } from '@/lib/utils';
+import type { LlmModel, Vault } from '@/lib/api';
 
 interface Message {
   role: 'user' | 'assistant';
@@ -22,11 +25,24 @@ interface ChatInterfaceProps {
   chatId?: string;
   threadId?: string;
   title?: string;
+  subtitle?: string;
   modelName?: string;
   modelDisplayName?: string;
   modelAvatarUrl?: string;
+  vaultOptions?: Vault[];
+  modelOptions?: LlmModel[];
   initialMessages?: Message[];
   readOnly?: boolean;
+  shareState?: {
+    isShared: boolean;
+    shareUrl?: string | null;
+  };
+  onTitleCommit?: (title: string) => void | Promise<void>;
+  onVaultChange?: (vaultId: string) => void | Promise<void>;
+  onModelChange?: (modelName: string) => void | Promise<void>;
+  onShareToggle?: () => void | Promise<void>;
+  onShareCopy?: () => void | Promise<void>;
+  savingLabel?: string | null;
   onChatCreated?: (chatId: string, threadId: string) => void;
 }
 
@@ -36,11 +52,21 @@ export function ChatInterface({
   chatId: initialChatId,
   threadId: initialThreadId,
   title,
+  subtitle,
   modelName,
   modelDisplayName,
   modelAvatarUrl,
+  vaultOptions,
+  modelOptions,
   initialMessages,
   readOnly = false,
+  shareState,
+  onTitleCommit,
+  onVaultChange,
+  onModelChange,
+  onShareToggle,
+  onShareCopy,
+  savingLabel,
   onChatCreated,
 }: ChatInterfaceProps) {
   const [messages, setMessages] = useState<Message[]>(initialMessages || []);
@@ -51,12 +77,18 @@ export function ChatInterface({
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const scrollContainerRef = useRef<HTMLDivElement>(null);
   const [isStreaming, setIsStreaming] = useState(false);
+  const [isEditingTitle, setIsEditingTitle] = useState(false);
+  const [titleDraft, setTitleDraft] = useState(title || '');
 
   useEffect(() => {
     if (initialMessages) {
       setMessages(initialMessages);
     }
   }, [initialMessages]);
+
+  useEffect(() => {
+    setTitleDraft(title || '');
+  }, [title]);
 
   useEffect(() => {
     if (initialChatId) {
@@ -92,6 +124,16 @@ export function ChatInterface({
       scrollToBottom();
     }
   }, [messages, isStreaming]);
+
+  const commitTitle = async () => {
+    if (!onTitleCommit) {
+      setIsEditingTitle(false);
+      return;
+    }
+    const nextTitle = titleDraft.trim() || 'Новый чат';
+    await onTitleCommit(nextTitle);
+    setIsEditingTitle(false);
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -236,7 +278,7 @@ export function ChatInterface({
       {/* Header */}
       <Card className="flex-none border-b rounded-none border-border">
         <CardHeader className="py-4 px-6">
-          <div className="flex items-center gap-4">
+          <div className="flex items-start gap-4">
             {onBack && (
               <Button
                 variant="ghost"
@@ -248,12 +290,42 @@ export function ChatInterface({
               </Button>
             )}
             <div className="flex-1">
-              <CardTitle className="text-lg font-semibold">
-                {title || 'Чат с базой знаний'}
-              </CardTitle>
-              <p className="text-xs text-muted-foreground font-mono mt-1">
-                {vaultId.slice(0, 8)}...{vaultId.slice(-8)}
-              </p>
+              {isEditingTitle && !readOnly ? (
+                <Input
+                  value={titleDraft}
+                  onChange={(event) => setTitleDraft(event.target.value)}
+                  onBlur={commitTitle}
+                  onKeyDown={(event) => {
+                    if (event.key === 'Enter') {
+                      event.preventDefault();
+                      commitTitle();
+                    }
+                  }}
+                  autoFocus
+                  className="max-w-md text-lg font-semibold"
+                />
+              ) : (
+                <button
+                  type="button"
+                  className="text-left"
+                  onClick={() => {
+                    if (!readOnly && onTitleCommit) {
+                      setIsEditingTitle(true);
+                    }
+                  }}
+                >
+                  <CardTitle className="text-lg font-semibold">
+                    {title || 'Чат с базой знаний'}
+                  </CardTitle>
+                </button>
+              )}
+              <div className="mt-1 flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
+                <span className="font-mono">
+                  {vaultId.slice(0, 8)}...{vaultId.slice(-8)}
+                </span>
+                {subtitle && <span>{subtitle}</span>}
+                {savingLabel && <span className="text-primary">{savingLabel}</span>}
+              </div>
               {(modelDisplayName || modelName) && (
                 <div className="mt-2 inline-flex items-center gap-2 rounded-full border border-border/60 bg-muted/40 px-2.5 py-1 text-xs text-muted-foreground">
                   {modelAvatarUrl ? (
@@ -271,6 +343,43 @@ export function ChatInterface({
                 </p>
               )}
             </div>
+            {!readOnly && shareState && onShareToggle && (
+              <Dialog>
+                <DialogTrigger asChild>
+                  <Button variant="ghost" size="icon">
+                    <MoreVertical className="h-5 w-5" />
+                  </Button>
+                </DialogTrigger>
+                <DialogContent>
+                  <DialogHeader>
+                    <DialogTitle>Шэринг чата</DialogTitle>
+                  </DialogHeader>
+                  <div className="space-y-3 text-sm text-muted-foreground">
+                    <div>
+                      {shareState.isShared
+                        ? 'Чат опубликован (только чтение).'
+                        : 'Чат приватный. Публикация откроет доступ по ссылке.'}
+                    </div>
+                    {shareState.isShared && shareState.shareUrl && (
+                      <div className="flex items-center gap-2">
+                        <Input value={shareState.shareUrl} readOnly />
+                        <Button variant="outline" onClick={onShareCopy}>
+                          Копировать
+                        </Button>
+                      </div>
+                    )}
+                  </div>
+                  <DialogFooter>
+                    <Button
+                      variant={shareState.isShared ? 'destructive' : 'default'}
+                      onClick={onShareToggle}
+                    >
+                      {shareState.isShared ? 'Отключить шэринг' : 'Поделиться'}
+                    </Button>
+                  </DialogFooter>
+                </DialogContent>
+              </Dialog>
+            )}
           </div>
         </CardHeader>
       </Card>
@@ -330,28 +439,66 @@ export function ChatInterface({
       {!readOnly && (
         <Card className="flex-none border-t rounded-none border-border">
           <CardContent className="p-4">
-            <form onSubmit={handleSubmit} className="flex gap-3 max-w-4xl mx-auto">
-              <input
-                type="text"
-                value={input}
-                onChange={(e) => setInput(e.target.value)}
-                placeholder="Введите ваш вопрос..."
-                disabled={isLoading}
-                className="flex-1 px-4 py-3 rounded-md border border-input bg-background text-sm focus:outline-none focus:ring-2 focus:ring-ring focus:border-transparent transition-all"
-              />
-              <Button
-                type="submit"
-                disabled={isLoading || !input.trim()}
-                size="lg"
-                className="px-6"
-              >
-                {isLoading ? (
-                  <Loader2 className="w-4 h-4 animate-spin" />
-                ) : (
-                  <Send className="w-4 h-4" />
-                )}
-              </Button>
-            </form>
+            <div className="max-w-4xl mx-auto space-y-3">
+              {(vaultOptions?.length || modelOptions?.length) && (
+                <div className="flex flex-wrap gap-3">
+                  {vaultOptions && vaultOptions.length > 0 && (
+                    <div className="min-w-[200px] flex-1">
+                      <label className="text-xs text-muted-foreground">Хранилище</label>
+                      <select
+                        value={vaultId}
+                        onChange={(event) => onVaultChange?.(event.target.value)}
+                        className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
+                      >
+                        {vaultOptions.map((vault) => (
+                          <option key={vault.vault_id} value={vault.vault_id}>
+                            {vault.name}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+                  )}
+                  {modelOptions && modelOptions.length > 0 && (
+                    <div className="min-w-[200px] flex-1">
+                      <label className="text-xs text-muted-foreground">Модель</label>
+                      <select
+                        value={modelName || ''}
+                        onChange={(event) => onModelChange?.(event.target.value)}
+                        className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
+                      >
+                        {modelOptions.map((model) => (
+                          <option key={model.id} value={model.system_name}>
+                            {model.display_name}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+                  )}
+                </div>
+              )}
+              <form onSubmit={handleSubmit} className="flex gap-3">
+                <input
+                  type="text"
+                  value={input}
+                  onChange={(e) => setInput(e.target.value)}
+                  placeholder="Введите ваш вопрос..."
+                  disabled={isLoading}
+                  className="flex-1 px-4 py-3 rounded-md border border-input bg-background text-sm focus:outline-none focus:ring-2 focus:ring-ring focus:border-transparent transition-all"
+                />
+                <Button
+                  type="submit"
+                  disabled={isLoading || !input.trim()}
+                  size="lg"
+                  className="px-6"
+                >
+                  {isLoading ? (
+                    <Loader2 className="w-4 h-4 animate-spin" />
+                  ) : (
+                    <Send className="w-4 h-4" />
+                  )}
+                </Button>
+              </form>
+            </div>
           </CardContent>
         </Card>
       )}
