@@ -372,7 +372,7 @@ export default function Home() {
                         return (
                           <button
                             key={chat.id}
-                            onClick={() => router.push(`/chats/${chat.id}`)}
+                            onClick={() => router.push(`/chats/${chat.id}?returnTo=/`)}
                             className="w-full rounded-lg border border-border/60 bg-card px-3 py-3 text-left transition hover:border-primary/60"
                           >
                             <div className="flex items-center gap-3">

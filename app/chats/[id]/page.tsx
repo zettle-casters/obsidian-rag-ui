@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useMemo, useState } from 'react';
-import { useParams, useRouter } from 'next/navigation';
+import { useParams, useRouter, useSearchParams } from 'next/navigation';
 import { ChatInterface } from '@/components/ChatInterface';
 import {
   fetchChat,
@@ -25,7 +25,9 @@ const formatDate = (value?: string | null) => {
 export default function ChatDetailPage() {
   const router = useRouter();
   const params = useParams();
+  const searchParams = useSearchParams();
   const chatId = params?.id as string;
+  const returnTo = searchParams?.get('returnTo') || '/chats';
 
   const [detail, setDetail] = useState<ChatDetail | null>(null);
   const [vaults, setVaults] = useState<Vault[]>([]);
@@ -181,7 +183,10 @@ export default function ChatDetailPage() {
         onModelChange={handleModelChange}
         onShareToggle={handleToggleShare}
         onShareCopy={copyShareLink}
-        onBack={() => router.push('/chats')}
+        onBack={() => {
+          const target = returnTo.startsWith('/') ? returnTo : '/chats';
+          router.push(target);
+        }}
       />
     </div>
   );
