@@ -26,6 +26,12 @@ export interface AuthUser {
   is_demo: boolean;
 }
 
+export interface McpTokenInfo {
+  token: string;
+  created_at: string;
+  last_used_at?: string | null;
+}
+
 export interface ChatMessage {
   role: 'user' | 'assistant' | 'system';
   content: string;
@@ -53,6 +59,30 @@ export async function logout(): Promise<void> {
     method: 'POST',
     credentials: 'include',
   });
+}
+
+export async function fetchMcpToken(): Promise<McpTokenInfo | null> {
+  const response = await fetch(`${API_BASE_URL}/auth/mcp-token`, {
+    credentials: 'include',
+  });
+  if (response.status === 403) {
+    return null;
+  }
+  if (!response.ok) {
+    throw new Error('Failed to fetch MCP token');
+  }
+  return (await response.json()) as McpTokenInfo;
+}
+
+export async function rotateMcpToken(): Promise<McpTokenInfo> {
+  const response = await fetch(`${API_BASE_URL}/auth/mcp-token/rotate`, {
+    method: 'POST',
+    credentials: 'include',
+  });
+  if (!response.ok) {
+    throw new Error('Failed to rotate MCP token');
+  }
+  return (await response.json()) as McpTokenInfo;
 }
 
 export async function fetchVaults(): Promise<Vault[]> {

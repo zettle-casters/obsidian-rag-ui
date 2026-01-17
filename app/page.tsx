@@ -9,7 +9,18 @@ import { UploadDialog } from '@/components/UploadDialog';
 import { ChatInterface } from '@/components/ChatInterface';
 import TestInterface from '@/components/TestInterface';
 import { AuthBar } from '@/components/AuthBar';
-import { fetchMe, fetchVaults, uploadVault, type AuthUser, type Vault, type UploadProgress as UploadProgressType } from '@/lib/api';
+import { McpTokenCard } from '@/components/McpTokenCard';
+import {
+  fetchMe,
+  fetchVaults,
+  uploadVault,
+  fetchMcpToken,
+  rotateMcpToken,
+  type AuthUser,
+  type McpTokenInfo,
+  type Vault,
+  type UploadProgress as UploadProgressType,
+} from '@/lib/api';
 
 type View = 'vaults' | 'chat' | 'tests';
 
@@ -19,6 +30,9 @@ export default function Home() {
   const [selectedVault, setSelectedVault] = useState<string | null>(null);
   const [user, setUser] = useState<AuthUser | null>(null);
   const [authLoading, setAuthLoading] = useState(true);
+  const [mcpToken, setMcpToken] = useState<McpTokenInfo | null>(null);
+  const [mcpTokenLoading, setMcpTokenLoading] = useState(false);
+  const [mcpTokenError, setMcpTokenError] = useState<string | null>(null);
   const [isUploading, setIsUploading] = useState(false);
   const [uploadProgress, setUploadProgress] = useState<UploadProgressType | null>(null);
   const [isDragging, setIsDragging] = useState(false);
@@ -28,6 +42,15 @@ export default function Home() {
   useEffect(() => {
     loadUser();
   }, []);
+
+  useEffect(() => {
+    if (!user || user.is_demo) {
+      setMcpToken(null);
+      setMcpTokenError(null);
+      return;
+    }
+    loadMcpToken();
+  }, [user]);
 
   const loadUser = async () => {
     setAuthLoading(true);
@@ -40,6 +63,37 @@ export default function Home() {
     } finally {
       setAuthLoading(false);
       await loadVaults();
+    }
+  };
+
+  const loadMcpToken = async () => {
+    setMcpTokenLoading(true);
+    setMcpTokenError(null);
+    try {
+      const tokenInfo = await fetchMcpToken();
+      setMcpToken(tokenInfo);
+    } catch (error) {
+      console.error('Failed to fetch MCP token:', error);
+      setMcpTokenError('Не удалось получить MCP токен');
+    } finally {
+      setMcpTokenLoading(false);
+    }
+  };
+
+  const handleRotateToken = async () => {
+    if (!user || user.is_demo) return;
+    const confirmRotate = window.confirm('Пересоздать MCP токен? Старый токен перестанет работать.');
+    if (!confirmRotate) return;
+    setMcpTokenLoading(true);
+    setMcpTokenError(null);
+    try {
+      const tokenInfo = await rotateMcpToken();
+      setMcpToken(tokenInfo);
+    } catch (error) {
+      console.error('Failed to rotate MCP token:', error);
+      setMcpTokenError('Не удалось пересоздать MCP токен');
+    } finally {
+      setMcpTokenLoading(false);
     }
   };
 
@@ -218,6 +272,15 @@ export default function Home() {
               </div>
             </div>
           </div>
+        {!selectedFile && (
+          <McpTokenCard
+            tokenInfo={mcpToken}
+            loading={mcpTokenLoading}
+            error={mcpTokenError}
+            isDemo={user?.is_demo ?? true}
+            onRotate={handleRotateToken}
+          />
+        )}
         {/* Drag overlay */}
         {isDragging && (
           <Card className="border-dashed border-2 border-primary bg-card/50 backdrop-blur">
