@@ -24,6 +24,7 @@ export interface AuthUser {
   name?: string | null;
   avatar_url?: string | null;
   is_demo: boolean;
+  is_admin?: boolean;
 }
 
 export interface McpTokenInfo {
@@ -35,6 +36,42 @@ export interface McpTokenInfo {
 export interface ChatMessage {
   role: 'user' | 'assistant' | 'system';
   content: string;
+}
+
+export interface ChatMessageRecord extends ChatMessage {
+  id: string;
+  created_at: string;
+}
+
+export interface ChatSummary {
+  id: string;
+  title: string;
+  vault_id: string;
+  model_name?: string | null;
+  thread_id: string;
+  is_shared: boolean;
+  share_token?: string | null;
+  share_url?: string | null;
+  created_at: string;
+  updated_at: string;
+  message_count: number;
+  last_message_at?: string | null;
+}
+
+export interface ChatDetail {
+  chat: ChatSummary;
+  messages: ChatMessageRecord[];
+}
+
+export interface LlmModel {
+  id: string;
+  display_name: string;
+  system_name: string;
+  description?: string | null;
+  avatar_url?: string | null;
+  is_enabled: boolean;
+  created_at: string;
+  updated_at: string;
 }
 
 export async function fetchMe(): Promise<AuthUser | null> {
@@ -169,7 +206,9 @@ export async function uploadVault(
 export async function* streamAgentResponse(
   query: string,
   vaultId: string,
-  threadId?: string
+  threadId?: string,
+  chatId?: string,
+  modelName?: string
 ): AsyncGenerator<any> {
   const response = await fetch(`${API_BASE_URL}/agent/stream`, {
     method: 'POST',
@@ -180,6 +219,8 @@ export async function* streamAgentResponse(
       query,
       vault_id: vaultId,
       thread_id: threadId,
+      chat_id: chatId,
+      model_name: modelName,
     }),
     credentials: 'include',
   });
@@ -230,6 +271,163 @@ export async function* streamAgentResponse(
   } finally {
     reader.releaseLock();
   }
+}
+
+export async function fetchChats(query?: string): Promise<ChatSummary[]> {
+  const url = new URL(`${API_BASE_URL}/chats`);
+  if (query) {
+    url.searchParams.set('q', query);
+  }
+  const response = await fetch(url.toString(), { credentials: 'include' });
+  if (!response.ok) {
+    throw new Error('Failed to fetch chats');
+  }
+  const data = await response.json();
+  return Array.isArray(data.chats) ? data.chats : [];
+}
+
+export async function fetchModels(includeDisabled = false): Promise<LlmModel[]> {
+  const url = new URL(`${API_BASE_URL}/models`);
+  if (includeDisabled) {
+    url.searchParams.set('include_disabled', 'true');
+  }
+  const response = await fetch(url.toString(), { credentials: 'include' });
+  if (!response.ok) {
+    throw new Error('Failed to fetch models');
+  }
+  const data = await response.json();
+  return Array.isArray(data.models) ? data.models : [];
+}
+
+export async function createModel(payload: {
+  display_name: string;
+  system_name: string;
+  description?: string | null;
+  avatar_url?: string | null;
+  is_enabled?: boolean;
+}): Promise<LlmModel> {
+  const response = await fetch(`${API_BASE_URL}/models`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    credentials: 'include',
+    body: JSON.stringify(payload),
+  });
+  if (!response.ok) {
+    throw new Error('Failed to create model');
+  }
+  const data = await response.json();
+  return data.model as LlmModel;
+}
+
+export async function updateModel(modelId: string, payload: {
+  display_name?: string;
+  system_name?: string;
+  description?: string | null;
+  avatar_url?: string | null;
+  is_enabled?: boolean;
+}): Promise<LlmModel> {
+  const response = await fetch(`${API_BASE_URL}/models/${modelId}`, {
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json' },
+    credentials: 'include',
+    body: JSON.stringify(payload),
+  });
+  if (!response.ok) {
+    throw new Error('Failed to update model');
+  }
+  const data = await response.json();
+  return data.model as LlmModel;
+}
+
+export async function createChat(payload: {
+  vault_id: string;
+  title?: string;
+  model_name?: string;
+  thread_id?: string;
+}): Promise<ChatSummary> {
+  const response = await fetch(`${API_BASE_URL}/chats`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    credentials: 'include',
+    body: JSON.stringify(payload),
+  });
+  if (!response.ok) {
+    throw new Error('Failed to create chat');
+  }
+  const data = await response.json();
+  return data.chat as ChatSummary;
+}
+
+export async function fetchChat(chatId: string): Promise<ChatDetail> {
+  const response = await fetch(`${API_BASE_URL}/chats/${chatId}`, {
+    credentials: 'include',
+  });
+  if (!response.ok) {
+    throw new Error('Failed to fetch chat');
+  }
+  return (await response.json()) as ChatDetail;
+}
+
+export async function appendChatMessage(chatId: string, message: ChatMessage): Promise<void> {
+  const response = await fetch(`${API_BASE_URL}/chats/${chatId}/messages`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    credentials: 'include',
+    body: JSON.stringify(message),
+  });
+  if (!response.ok) {
+    throw new Error('Failed to append chat message');
+  }
+}
+
+export async function updateChat(chatId: string, payload: {
+  title?: string;
+  vault_id?: string;
+  model_name?: string;
+}): Promise<ChatSummary> {
+  const response = await fetch(`${API_BASE_URL}/chats/${chatId}`, {
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json' },
+    credentials: 'include',
+    body: JSON.stringify(payload),
+  });
+  if (!response.ok) {
+    throw new Error('Failed to update chat');
+  }
+  const data = await response.json();
+  return data.chat as ChatSummary;
+}
+
+export async function shareChat(chatId: string): Promise<ChatSummary> {
+  const response = await fetch(`${API_BASE_URL}/chats/${chatId}/share`, {
+    method: 'POST',
+    credentials: 'include',
+  });
+  if (!response.ok) {
+    throw new Error('Failed to share chat');
+  }
+  const data = await response.json();
+  return data.chat as ChatSummary;
+}
+
+export async function unshareChat(chatId: string): Promise<ChatSummary> {
+  const response = await fetch(`${API_BASE_URL}/chats/${chatId}/share`, {
+    method: 'DELETE',
+    credentials: 'include',
+  });
+  if (!response.ok) {
+    throw new Error('Failed to disable chat sharing');
+  }
+  const data = await response.json();
+  return data.chat as ChatSummary;
+}
+
+export async function fetchSharedChat(token: string): Promise<ChatDetail> {
+  const response = await fetch(`${API_BASE_URL}/chats/shared/${token}`);
+  if (!response.ok) {
+    throw new Error('Failed to fetch shared chat');
+  }
+  return (await response.json()) as ChatDetail;
 }
 
 export async function* streamTestRun(): AsyncGenerator<any> {

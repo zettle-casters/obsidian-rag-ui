@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect, useRef } from 'react';
+import { useRouter } from 'next/navigation';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Upload, FileArchive, FlaskConical } from 'lucide-react';
@@ -25,6 +26,7 @@ import {
 type View = 'vaults' | 'chat' | 'tests';
 
 export default function Home() {
+  const router = useRouter();
   const [view, setView] = useState<View>('vaults');
   const [vaults, setVaults] = useState<Vault[]>([]);
   const [selectedVault, setSelectedVault] = useState<string | null>(null);
@@ -241,6 +243,24 @@ export default function Home() {
             <div className="flex flex-col items-end gap-3">
               <AuthBar user={user} loading={authLoading} onLoggedOut={loadUser} />
               <div className="flex gap-3">
+                <Button
+                  onClick={() => router.push('/chats')}
+                  variant="outline"
+                  className="gap-2 font-medium"
+                  size="lg"
+                >
+                  Чаты
+                </Button>
+                {user?.is_admin && (
+                  <Button
+                    onClick={() => router.push('/admin/models')}
+                    variant="outline"
+                    className="gap-2 font-medium"
+                    size="lg"
+                  >
+                    Админка
+                  </Button>
+                )}
                 <Button
                   onClick={() => setView('tests')}
                   variant="outline"

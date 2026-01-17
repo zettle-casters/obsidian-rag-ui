@@ -5,7 +5,7 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { ArrowLeft, Send, Loader2 } from 'lucide-react';
-import { streamAgentResponse } from '@/lib/api';
+import { appendChatMessage, createChat, streamAgentResponse } from '@/lib/api';
 import { MarkdownContent } from '@/components/MarkdownContent';
 import { ThinkingBlock, NodeEvent } from '@/components/ThinkingBlock';
 import { generateUUID } from '@/lib/utils';
@@ -18,17 +18,50 @@ interface Message {
 
 interface ChatInterfaceProps {
   vaultId: string;
-  onBack: () => void;
+  onBack?: () => void;
+  chatId?: string;
+  threadId?: string;
+  title?: string;
+  modelName?: string;
+  initialMessages?: Message[];
+  readOnly?: boolean;
+  onChatCreated?: (chatId: string, threadId: string) => void;
 }
 
-export function ChatInterface({ vaultId, onBack }: ChatInterfaceProps) {
-  const [messages, setMessages] = useState<Message[]>([]);
+export function ChatInterface({
+  vaultId,
+  onBack,
+  chatId: initialChatId,
+  threadId: initialThreadId,
+  title,
+  modelName,
+  initialMessages,
+  readOnly = false,
+  onChatCreated,
+}: ChatInterfaceProps) {
+  const [messages, setMessages] = useState<Message[]>(initialMessages || []);
   const [input, setInput] = useState('');
   const [isLoading, setIsLoading] = useState(false);
-  const [threadId] = useState(() => generateUUID());
+  const [threadId, setThreadId] = useState(initialThreadId || '');
+  const [chatId, setChatId] = useState(initialChatId || '');
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const scrollContainerRef = useRef<HTMLDivElement>(null);
   const [isStreaming, setIsStreaming] = useState(false);
+
+  useEffect(() => {
+    if (initialMessages) {
+      setMessages(initialMessages);
+    }
+  }, [initialMessages]);
+
+  useEffect(() => {
+    if (initialChatId) {
+      setChatId(initialChatId);
+    }
+    if (initialThreadId) {
+      setThreadId(initialThreadId);
+    }
+  }, [initialChatId, initialThreadId]);
 
   // Check if user is already at the bottom
   const isUserAtBottom = () => {
@@ -58,7 +91,7 @@ export function ChatInterface({ vaultId, onBack }: ChatInterfaceProps) {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!input.trim() || isLoading) return;
+    if (!input.trim() || isLoading || readOnly) return;
 
     const userMessage: Message = { role: 'user', content: input };
     setMessages((prev) => [...prev, userMessage]);
@@ -83,7 +116,30 @@ export function ChatInterface({ vaultId, onBack }: ChatInterfaceProps) {
     setIsStreaming(true); // Start streaming - no auto-scroll during streaming
 
     try {
-      for await (const event of streamAgentResponse(input, vaultId, threadId)) {
+      let activeChatId = chatId;
+      let activeThreadId = threadId;
+
+      if (!activeChatId) {
+        const created = await createChat({
+          vault_id: vaultId,
+          title: input.trim().slice(0, 80),
+          model_name: modelName || undefined,
+          thread_id: activeThreadId || undefined,
+        });
+        activeChatId = created.id;
+        activeThreadId = created.thread_id || generateUUID();
+        setChatId(activeChatId);
+        setThreadId(activeThreadId);
+        onChatCreated?.(activeChatId, activeThreadId);
+      }
+
+      if (activeChatId) {
+        appendChatMessage(activeChatId, { role: 'user', content: userMessage.content }).catch((error) => {
+          console.error('Failed to save user message:', error);
+        });
+      }
+
+      for await (const event of streamAgentResponse(input, vaultId, activeThreadId, activeChatId, modelName)) {
         if (event.type === 'node_start') {
           // Нода начала работу
           const newNode: NodeEvent = {
@@ -141,6 +197,15 @@ export function ChatInterface({ vaultId, onBack }: ChatInterfaceProps) {
           // Stream complete
         }
       }
+
+      if (activeChatId && assistantContent.trim()) {
+        appendChatMessage(activeChatId, {
+          role: 'assistant',
+          content: assistantContent,
+        }).catch((error) => {
+          console.error('Failed to save assistant message:', error);
+        });
+      }
     } catch (error) {
       console.error('Error streaming response:', error);
       setMessages((prev) => {
@@ -168,21 +233,28 @@ export function ChatInterface({ vaultId, onBack }: ChatInterfaceProps) {
       <Card className="flex-none border-b rounded-none border-border">
         <CardHeader className="py-4 px-6">
           <div className="flex items-center gap-4">
-            <Button
-              variant="ghost"
-              size="icon"
-              onClick={onBack}
-              className="hover:bg-accent"
-            >
-              <ArrowLeft className="w-5 h-5" />
-            </Button>
+            {onBack && (
+              <Button
+                variant="ghost"
+                size="icon"
+                onClick={onBack}
+                className="hover:bg-accent"
+              >
+                <ArrowLeft className="w-5 h-5" />
+              </Button>
+            )}
             <div className="flex-1">
               <CardTitle className="text-lg font-semibold">
-                Чат с базой знаний
+                {title || 'Чат с базой знаний'}
               </CardTitle>
               <p className="text-xs text-muted-foreground font-mono mt-1">
                 {vaultId.slice(0, 8)}...{vaultId.slice(-8)}
               </p>
+              {readOnly && (
+                <p className="text-xs text-muted-foreground mt-1">
+                  Режим только для чтения
+                </p>
+              )}
             </div>
           </div>
         </CardHeader>
@@ -240,32 +312,34 @@ export function ChatInterface({ vaultId, onBack }: ChatInterfaceProps) {
       </div>
 
       {/* Input */}
-      <Card className="flex-none border-t rounded-none border-border">
-        <CardContent className="p-4">
-          <form onSubmit={handleSubmit} className="flex gap-3 max-w-4xl mx-auto">
-            <input
-              type="text"
-              value={input}
-              onChange={(e) => setInput(e.target.value)}
-              placeholder="Введите ваш вопрос..."
-              disabled={isLoading}
-              className="flex-1 px-4 py-3 rounded-md border border-input bg-background text-sm focus:outline-none focus:ring-2 focus:ring-ring focus:border-transparent transition-all"
-            />
-            <Button
-              type="submit"
-              disabled={isLoading || !input.trim()}
-              size="lg"
-              className="px-6"
-            >
-              {isLoading ? (
-                <Loader2 className="w-4 h-4 animate-spin" />
-              ) : (
-                <Send className="w-4 h-4" />
-              )}
-            </Button>
-          </form>
-        </CardContent>
-      </Card>
+      {!readOnly && (
+        <Card className="flex-none border-t rounded-none border-border">
+          <CardContent className="p-4">
+            <form onSubmit={handleSubmit} className="flex gap-3 max-w-4xl mx-auto">
+              <input
+                type="text"
+                value={input}
+                onChange={(e) => setInput(e.target.value)}
+                placeholder="Введите ваш вопрос..."
+                disabled={isLoading}
+                className="flex-1 px-4 py-3 rounded-md border border-input bg-background text-sm focus:outline-none focus:ring-2 focus:ring-ring focus:border-transparent transition-all"
+              />
+              <Button
+                type="submit"
+                disabled={isLoading || !input.trim()}
+                size="lg"
+                className="px-6"
+              >
+                {isLoading ? (
+                  <Loader2 className="w-4 h-4 animate-spin" />
+                ) : (
+                  <Send className="w-4 h-4" />
+                )}
+              </Button>
+            </form>
+          </CardContent>
+        </Card>
+      )}
     </div>
   );
 }
