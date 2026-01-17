@@ -18,13 +18,47 @@ export interface UploadProgress {
   error?: string;
 }
 
+export interface AuthUser {
+  id: string;
+  email?: string | null;
+  name?: string | null;
+  avatar_url?: string | null;
+  is_demo: boolean;
+}
+
 export interface ChatMessage {
   role: 'user' | 'assistant' | 'system';
   content: string;
 }
 
+export async function fetchMe(): Promise<AuthUser | null> {
+  const response = await fetch(`${API_BASE_URL}/auth/me`, {
+    credentials: 'include',
+  });
+  if (!response.ok) {
+    return null;
+  }
+  const data = await response.json();
+  return data.user as AuthUser;
+}
+
+export function loginWithGoogle(returnTo?: string) {
+  const target = returnTo || window.location.href;
+  const url = `${API_BASE_URL}/auth/google/login?return_to=${encodeURIComponent(target)}`;
+  window.location.href = url;
+}
+
+export async function logout(): Promise<void> {
+  await fetch(`${API_BASE_URL}/auth/logout`, {
+    method: 'POST',
+    credentials: 'include',
+  });
+}
+
 export async function fetchVaults(): Promise<Vault[]> {
-  const response = await fetch(`${API_BASE_URL}/vaults`);
+  const response = await fetch(`${API_BASE_URL}/vaults`, {
+    credentials: 'include',
+  });
   if (!response.ok) {
     throw new Error('Failed to fetch vaults');
   }
@@ -45,6 +79,7 @@ export async function uploadVault(
   const response = await fetch(`${API_BASE_URL}/upload/stream`, {
     method: 'POST',
     body: formData,
+    credentials: 'include',
   });
 
   if (!response.ok) {
@@ -116,6 +151,7 @@ export async function* streamAgentResponse(
       vault_id: vaultId,
       thread_id: threadId,
     }),
+    credentials: 'include',
   });
 
   if (!response.ok) {
@@ -169,6 +205,7 @@ export async function* streamAgentResponse(
 export async function* streamTestRun(): AsyncGenerator<any> {
   const response = await fetch(`${API_BASE_URL}/tests/run`, {
     method: 'POST',
+    credentials: 'include',
   });
 
   if (!response.ok) {
@@ -212,7 +249,9 @@ export async function* streamTestRun(): AsyncGenerator<any> {
 }
 
 export async function fetchTestResults(): Promise<any> {
-  const response = await fetch(`${API_BASE_URL}/tests/results`);
+  const response = await fetch(`${API_BASE_URL}/tests/results`, {
+    credentials: 'include',
+  });
   if (!response.ok) {
     if (response.status === 404) {
       return null;
