@@ -17,10 +17,10 @@ export default function SharedChatPage() {
 
   const initialMessages = useMemo(() => {
     if (!detail?.messages) return [];
-    return detail.messages.map((message) => ({
-      role: message.role === 'assistant' ? 'assistant' : 'user',
-      content: message.content,
-    }));
+    return detail.messages.map((message) => {
+      const role = (message.role === 'assistant' ? 'assistant' : 'user') as const;
+      return { role, content: message.content };
+    });
   }, [detail]);
 
   useEffect(() => {
