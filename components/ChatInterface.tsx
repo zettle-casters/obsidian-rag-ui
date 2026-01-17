@@ -6,7 +6,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import { ScrollArea } from '@/components/ui/scroll-area';
-import { ArrowLeft, Loader2, MoreVertical, Send } from 'lucide-react';
+import { ArrowLeft, ChevronDown, Loader2, MoreVertical, Send } from 'lucide-react';
 import { appendChatMessage, createChat, streamAgentResponse } from '@/lib/api';
 import { MarkdownContent } from '@/components/MarkdownContent';
 import { ThinkingBlock, NodeEvent } from '@/components/ThinkingBlock';
@@ -445,33 +445,39 @@ export function ChatInterface({
                   {vaultOptions && vaultOptions.length > 0 && (
                     <div className="min-w-[200px] flex-1">
                       <label className="text-xs text-muted-foreground">Хранилище</label>
-                      <select
-                        value={vaultId}
-                        onChange={(event) => onVaultChange?.(event.target.value)}
-                        className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
-                      >
-                        {vaultOptions.map((vault) => (
-                          <option key={vault.vault_id} value={vault.vault_id}>
-                            {vault.name}
-                          </option>
-                        ))}
-                      </select>
+                      <div className="relative">
+                        <select
+                          value={vaultId}
+                          onChange={(event) => onVaultChange?.(event.target.value)}
+                          className="w-full appearance-none rounded-md border border-input bg-background px-3 py-2 pr-10 text-sm"
+                        >
+                          {vaultOptions.map((vault) => (
+                            <option key={vault.vault_id} value={vault.vault_id}>
+                              {vault.name}
+                            </option>
+                          ))}
+                        </select>
+                        <ChevronDown className="pointer-events-none absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+                      </div>
                     </div>
                   )}
                   {modelOptions && modelOptions.length > 0 && (
                     <div className="min-w-[200px] flex-1">
                       <label className="text-xs text-muted-foreground">Модель</label>
-                      <select
-                        value={modelName || ''}
-                        onChange={(event) => onModelChange?.(event.target.value)}
-                        className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
-                      >
-                        {modelOptions.map((model) => (
-                          <option key={model.id} value={model.system_name}>
-                            {model.display_name}
-                          </option>
-                        ))}
-                      </select>
+                      <div className="relative">
+                        <select
+                          value={modelName || ''}
+                          onChange={(event) => onModelChange?.(event.target.value)}
+                          className="w-full appearance-none rounded-md border border-input bg-background px-3 py-2 pr-10 text-sm"
+                        >
+                          {modelOptions.map((model) => (
+                            <option key={model.id} value={model.system_name}>
+                              {model.display_name}
+                            </option>
+                          ))}
+                        </select>
+                        <ChevronDown className="pointer-events-none absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+                      </div>
                     </div>
                   )}
                 </div>
