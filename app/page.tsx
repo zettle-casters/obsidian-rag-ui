@@ -8,7 +8,8 @@ import { VaultsList } from '@/components/VaultsList';
 import { UploadDialog } from '@/components/UploadDialog';
 import { ChatInterface } from '@/components/ChatInterface';
 import TestInterface from '@/components/TestInterface';
-import { fetchVaults, uploadVault, type Vault, type UploadProgress as UploadProgressType } from '@/lib/api';
+import { AuthBar } from '@/components/AuthBar';
+import { fetchMe, fetchVaults, uploadVault, type AuthUser, type Vault, type UploadProgress as UploadProgressType } from '@/lib/api';
 
 type View = 'vaults' | 'chat' | 'tests';
 
@@ -16,6 +17,8 @@ export default function Home() {
   const [view, setView] = useState<View>('vaults');
   const [vaults, setVaults] = useState<Vault[]>([]);
   const [selectedVault, setSelectedVault] = useState<string | null>(null);
+  const [user, setUser] = useState<AuthUser | null>(null);
+  const [authLoading, setAuthLoading] = useState(true);
   const [isUploading, setIsUploading] = useState(false);
   const [uploadProgress, setUploadProgress] = useState<UploadProgressType | null>(null);
   const [isDragging, setIsDragging] = useState(false);
@@ -23,8 +26,22 @@ export default function Home() {
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
-    loadVaults();
+    loadUser();
   }, []);
+
+  const loadUser = async () => {
+    setAuthLoading(true);
+    try {
+      const currentUser = await fetchMe();
+      setUser(currentUser);
+    } catch (error) {
+      console.error('Failed to fetch user:', error);
+      setUser(null);
+    } finally {
+      setAuthLoading(false);
+      await loadVaults();
+    }
+  };
 
   const loadVaults = async () => {
     try {
@@ -159,43 +176,47 @@ export default function Home() {
       >
         <div className="max-w-6xl mx-auto space-y-8">
         {/* Header */}
-        <div className="flex items-center justify-between border-b border-border pb-6">
-          <div>
-            <h1 className="text-3xl font-bold tracking-tight">Obsidian RAG</h1>
-            <p className="text-muted-foreground mt-2 text-base">
-              RAG система для работы с Obsidian хранилищами знаний
-            </p>
-          </div>
+          <div className="flex items-center justify-between border-b border-border pb-6">
+            <div>
+              <h1 className="text-3xl font-bold tracking-tight">Obsidian RAG</h1>
+              <p className="text-muted-foreground mt-2 text-base">
+                RAG система для работы с Obsidian хранилищами знаний
+              </p>
+            </div>
 
-          <div className="flex gap-3">
-            <Button
-              onClick={() => setView('tests')}
-              variant="outline"
-              className="gap-2 font-medium"
-              size="lg"
-            >
-              <FlaskConical className="w-4 h-4" />
-              Тесты
-            </Button>
-            <input
-              ref={fileInputRef}
-              type="file"
-              accept=".zip"
-              className="hidden"
-              onChange={(e) => {
-                const file = e.target.files?.[0];
-                if (file) handleFileSelect(file);
-              }}
-            />
-            <Button
-              onClick={() => fileInputRef.current?.click()}
-              disabled={isUploading}
-              className="gap-2 font-medium"
-              size="lg"
-            >
-              <Upload className="w-4 h-4" />
-              Загрузить Vault
-            </Button>
+            <div className="flex flex-col items-end gap-3">
+              <AuthBar user={user} loading={authLoading} onLoggedOut={loadUser} />
+              <div className="flex gap-3">
+                <Button
+                  onClick={() => setView('tests')}
+                  variant="outline"
+                  className="gap-2 font-medium"
+                  size="lg"
+                >
+                  <FlaskConical className="w-4 h-4" />
+                  Тесты
+                </Button>
+                <input
+                  ref={fileInputRef}
+                  type="file"
+                  accept=".zip"
+                  className="hidden"
+                  onChange={(e) => {
+                    const file = e.target.files?.[0];
+                    if (file) handleFileSelect(file);
+                  }}
+                />
+                <Button
+                  onClick={() => fileInputRef.current?.click()}
+                  disabled={isUploading}
+                  className="gap-2 font-medium"
+                  size="lg"
+                >
+                  <Upload className="w-4 h-4" />
+                  Загрузить Vault
+                </Button>
+              </div>
+            </div>
           </div>
         </div>
 
