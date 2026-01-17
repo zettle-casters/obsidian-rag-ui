@@ -52,6 +52,24 @@ export default function Home() {
     loadMcpToken();
   }, [user]);
 
+  const setMcpTokenState = async (
+    action: () => Promise<McpTokenInfo | null>,
+    logLabel: string,
+    errorMessage: string
+  ) => {
+    setMcpTokenLoading(true);
+    setMcpTokenError(null);
+    try {
+      const tokenInfo = await action();
+      setMcpToken(tokenInfo);
+    } catch (error) {
+      console.error(logLabel, error);
+      setMcpTokenError(errorMessage);
+    } finally {
+      setMcpTokenLoading(false);
+    }
+  };
+
   const loadUser = async () => {
     setAuthLoading(true);
     try {
@@ -67,34 +85,14 @@ export default function Home() {
   };
 
   const loadMcpToken = async () => {
-    setMcpTokenLoading(true);
-    setMcpTokenError(null);
-    try {
-      const tokenInfo = await fetchMcpToken();
-      setMcpToken(tokenInfo);
-    } catch (error) {
-      console.error('Failed to fetch MCP token:', error);
-      setMcpTokenError('Не удалось получить MCP токен');
-    } finally {
-      setMcpTokenLoading(false);
-    }
+    await setMcpTokenState(fetchMcpToken, 'Failed to fetch MCP token:', 'Не удалось получить MCP токен');
   };
 
   const handleRotateToken = async () => {
     if (!user || user.is_demo) return;
     const confirmRotate = window.confirm('Пересоздать MCP токен? Старый токен перестанет работать.');
     if (!confirmRotate) return;
-    setMcpTokenLoading(true);
-    setMcpTokenError(null);
-    try {
-      const tokenInfo = await rotateMcpToken();
-      setMcpToken(tokenInfo);
-    } catch (error) {
-      console.error('Failed to rotate MCP token:', error);
-      setMcpTokenError('Не удалось пересоздать MCP токен');
-    } finally {
-      setMcpTokenLoading(false);
-    }
+    await setMcpTokenState(rotateMcpToken, 'Failed to rotate MCP token:', 'Не удалось пересоздать MCP токен');
   };
 
   const loadVaults = async () => {
@@ -128,9 +126,7 @@ export default function Home() {
       if (vaultId) {
         await loadVaults();
         setTimeout(() => {
-          setIsUploading(false);
-          setUploadProgress(null);
-          setSelectedFile(null);
+          resetUploadState();
         }, 2000);
       }
     } catch (error) {
@@ -145,10 +141,14 @@ export default function Home() {
     }
   };
 
-  const handleCancelUpload = () => {
+  const resetUploadState = () => {
     setSelectedFile(null);
     setIsUploading(false);
     setUploadProgress(null);
+  };
+
+  const handleCancelUpload = () => {
+    resetUploadState();
   };
 
   const handleDrop = (e: React.DragEvent) => {
