@@ -41,6 +41,10 @@ export default function ChatDetailPage() {
   const [shareLoading, setShareLoading] = useState(false);
   const [shareError, setShareError] = useState<string | null>(null);
 
+  const selectedModel = useMemo(() => {
+    return models.find((model) => model.system_name === modelName);
+  }, [models, modelName]);
+
   const initialMessages = useMemo(() => {
     if (!detail?.messages) return [];
     return detail.messages.map((message) => {
@@ -179,17 +183,25 @@ export default function ChatDetailPage() {
               </div>
               <div className="space-y-2">
                 <label className="text-sm font-medium text-muted-foreground">Модель</label>
-                <select
-                  value={modelName}
-                  onChange={(event) => setModelName(event.target.value)}
-                  className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
-                >
-                  {models.map((model) => (
-                    <option key={model.id} value={model.system_name}>
-                      {model.display_name}
-                    </option>
-                  ))}
-                </select>
+                <div className="flex items-center gap-3">
+                  <select
+                    value={modelName}
+                    onChange={(event) => setModelName(event.target.value)}
+                    className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
+                  >
+                    {models.map((model) => (
+                      <option key={model.id} value={model.system_name}>
+                        {model.display_name}
+                      </option>
+                    ))}
+                  </select>
+                  {selectedModel?.avatar_url ? (
+                    // eslint-disable-next-line @next/next/no-img-element
+                    <img src={selectedModel.avatar_url} alt={selectedModel.display_name} className="h-10 w-10 rounded-full border" />
+                  ) : (
+                    <div className="h-10 w-10 rounded-full bg-muted" />
+                  )}
+                </div>
               </div>
               <div className="md:col-span-3 flex flex-wrap items-center gap-3 rounded-lg border border-border/60 bg-muted/40 px-4 py-3">
                 <div className="flex-1 text-sm">
@@ -221,6 +233,8 @@ export default function ChatDetailPage() {
         threadId={detail.chat.thread_id}
         title={detail.chat.title}
         modelName={detail.chat.model_name || modelName}
+        modelDisplayName={selectedModel?.display_name}
+        modelAvatarUrl={selectedModel?.avatar_url || undefined}
         initialMessages={initialMessages}
         onBack={() => router.push('/chats')}
       />

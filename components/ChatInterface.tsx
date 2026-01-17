@@ -23,6 +23,8 @@ interface ChatInterfaceProps {
   threadId?: string;
   title?: string;
   modelName?: string;
+  modelDisplayName?: string;
+  modelAvatarUrl?: string;
   initialMessages?: Message[];
   readOnly?: boolean;
   onChatCreated?: (chatId: string, threadId: string) => void;
@@ -35,6 +37,8 @@ export function ChatInterface({
   threadId: initialThreadId,
   title,
   modelName,
+  modelDisplayName,
+  modelAvatarUrl,
   initialMessages,
   readOnly = false,
   onChatCreated,
@@ -250,6 +254,17 @@ export function ChatInterface({
               <p className="text-xs text-muted-foreground font-mono mt-1">
                 {vaultId.slice(0, 8)}...{vaultId.slice(-8)}
               </p>
+              {(modelDisplayName || modelName) && (
+                <div className="mt-2 inline-flex items-center gap-2 rounded-full border border-border/60 bg-muted/40 px-2.5 py-1 text-xs text-muted-foreground">
+                  {modelAvatarUrl ? (
+                    // eslint-disable-next-line @next/next/no-img-element
+                    <img src={modelAvatarUrl} alt={modelDisplayName || modelName} className="h-4 w-4 rounded-full" />
+                  ) : (
+                    <span className="h-4 w-4 rounded-full bg-muted-foreground/30" />
+                  )}
+                  <span>{modelDisplayName || modelName}</span>
+                </div>
+              )}
               {readOnly && (
                 <p className="text-xs text-muted-foreground mt-1">
                   Режим только для чтения

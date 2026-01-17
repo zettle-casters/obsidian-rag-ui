@@ -87,6 +87,7 @@ export default function SharedChatPage() {
         chatId={detail.chat.id}
         threadId={detail.chat.thread_id}
         title={detail.chat.title}
+        modelName={detail.chat.model_name || undefined}
         initialMessages={initialMessages}
         readOnly
       />

@@ -44,6 +44,10 @@ export default function ChatsPage() {
     return new Map(models.map((model) => [model.system_name, model.display_name]));
   }, [models]);
 
+  const modelBySystem = useMemo(() => {
+    return new Map(models.map((model) => [model.system_name, model]));
+  }, [models]);
+
   useEffect(() => {
     let active = true;
     const load = async () => {
@@ -156,17 +160,29 @@ export default function ChatsPage() {
                   </div>
                   <div className="space-y-2">
                     <label className="text-sm font-medium text-muted-foreground">Модель</label>
-                    <select
-                      value={newModel}
-                      onChange={(event) => setNewModel(event.target.value)}
-                      className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
-                    >
-                      {models.map((model) => (
-                        <option key={model.id} value={model.system_name}>
-                          {model.display_name}
-                        </option>
-                      ))}
-                    </select>
+                    <div className="flex items-center gap-3">
+                      <select
+                        value={newModel}
+                        onChange={(event) => setNewModel(event.target.value)}
+                        className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
+                      >
+                        {models.map((model) => (
+                          <option key={model.id} value={model.system_name}>
+                            {model.display_name}
+                          </option>
+                        ))}
+                      </select>
+                      {modelBySystem.get(newModel)?.avatar_url ? (
+                        // eslint-disable-next-line @next/next/no-img-element
+                        <img
+                          src={modelBySystem.get(newModel)?.avatar_url}
+                          alt={modelBySystem.get(newModel)?.display_name}
+                          className="h-10 w-10 rounded-full border"
+                        />
+                      ) : (
+                        <div className="h-10 w-10 rounded-full bg-muted" />
+                      )}
+                    </div>
                   </div>
                   {createError && (
                     <p className="text-sm text-destructive">{createError}</p>
@@ -203,8 +219,25 @@ export default function ChatsPage() {
               onClick={() => router.push(`/chats/${chat.id}`)}
             >
               <CardHeader className="pb-3">
-                <div className="flex flex-wrap items-center justify-between gap-2">
-                  <CardTitle className="text-lg">{chat.title || 'Новый чат'}</CardTitle>
+                <div className="flex flex-wrap items-center justify-between gap-3">
+                  <div className="flex items-center gap-3">
+                    {modelBySystem.get(chat.model_name || '')?.avatar_url ? (
+                      // eslint-disable-next-line @next/next/no-img-element
+                      <img
+                        src={modelBySystem.get(chat.model_name || '')?.avatar_url}
+                        alt={modelBySystem.get(chat.model_name || '')?.display_name}
+                        className="h-10 w-10 rounded-full border"
+                      />
+                    ) : (
+                      <div className="h-10 w-10 rounded-full bg-muted" />
+                    )}
+                    <div>
+                      <CardTitle className="text-lg">{chat.title || 'Новый чат'}</CardTitle>
+                      <div className="text-xs text-muted-foreground">
+                        {modelNameBySystem.get(chat.model_name || '') || chat.model_name || 'Модель не выбрана'}
+                      </div>
+                    </div>
+                  </div>
                   <div className="text-xs text-muted-foreground">
                     {chat.is_shared ? 'Публичный' : 'Приватный'}
                   </div>

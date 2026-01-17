@@ -4,6 +4,8 @@ import { useState, useEffect, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Input } from '@/components/ui/input';
+import { ScrollArea } from '@/components/ui/scroll-area';
 import { Upload, FileArchive, FlaskConical } from 'lucide-react';
 import { VaultsList } from '@/components/VaultsList';
 import { UploadDialog } from '@/components/UploadDialog';
@@ -14,10 +16,14 @@ import { McpTokenCard } from '@/components/McpTokenCard';
 import {
   fetchMe,
   fetchVaults,
+  fetchChats,
+  fetchModels,
   uploadVault,
   fetchMcpToken,
   rotateMcpToken,
   type AuthUser,
+  type ChatSummary,
+  type LlmModel,
   type McpTokenInfo,
   type Vault,
   type UploadProgress as UploadProgressType,
@@ -39,6 +45,10 @@ export default function Home() {
   const [uploadProgress, setUploadProgress] = useState<UploadProgressType | null>(null);
   const [isDragging, setIsDragging] = useState(false);
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
+  const [chats, setChats] = useState<ChatSummary[]>([]);
+  const [chatSearch, setChatSearch] = useState('');
+  const [chatLoading, setChatLoading] = useState(false);
+  const [models, setModels] = useState<LlmModel[]>([]);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
@@ -85,6 +95,44 @@ export default function Home() {
       await loadVaults();
     }
   };
+
+  useEffect(() => {
+    let active = true;
+    const loadModels = async () => {
+      try {
+        const list = await fetchModels();
+        if (!active) return;
+        setModels(list);
+      } catch (error) {
+        console.error('Failed to fetch models:', error);
+      }
+    };
+    loadModels();
+    return () => {
+      active = false;
+    };
+  }, []);
+
+  useEffect(() => {
+    let active = true;
+    const timer = setTimeout(async () => {
+      setChatLoading(true);
+      try {
+        const list = await fetchChats(chatSearch.trim() || undefined);
+        if (!active) return;
+        setChats(list);
+      } catch (error) {
+        console.error('Failed to fetch chats:', error);
+      } finally {
+        if (active) setChatLoading(false);
+      }
+    }, 250);
+
+    return () => {
+      active = false;
+      clearTimeout(timer);
+    };
+  }, [chatSearch, user]);
 
   const loadMcpToken = async () => {
     await setMcpTokenState(fetchMcpToken, 'Failed to fetch MCP token:', 'Не удалось получить MCP токен');
@@ -292,58 +340,125 @@ export default function Home() {
               </div>
             </div>
           </div>
-        {!selectedFile && (
-          <McpTokenCard
-            tokenInfo={mcpToken}
-            loading={mcpTokenLoading}
-            error={mcpTokenError}
-            isDemo={user?.is_demo ?? true}
-            onRotate={handleRotateToken}
-          />
-        )}
-        {/* Drag overlay */}
-        {isDragging && (
-          <Card className="border-dashed border-2 border-primary bg-card/50 backdrop-blur">
-            <CardContent className="flex flex-col items-center justify-center py-16">
-              <FileArchive className="w-20 h-20 text-primary mb-4" />
-              <p className="text-xl font-semibold">Отпустите файл для загрузки</p>
-              <p className="text-sm text-muted-foreground mt-2">
-                Принимаются только .zip файлы
-              </p>
-            </CardContent>
-          </Card>
-        )}
+          <div className="grid gap-6 lg:grid-cols-[280px,1fr]">
+            <aside className="space-y-4">
+              <Card>
+                <CardHeader className="pb-3">
+                  <div className="flex items-center justify-between">
+                    <CardTitle className="text-lg">Чаты</CardTitle>
+                    <Button variant="ghost" size="sm" onClick={() => router.push('/chats')}>
+                      Все
+                    </Button>
+                  </div>
+                  <Input
+                    value={chatSearch}
+                    onChange={(event) => setChatSearch(event.target.value)}
+                    placeholder="Поиск по чатам"
+                  />
+                </CardHeader>
+                <CardContent className="pt-0">
+                  <ScrollArea className="h-[420px] pr-3">
+                    <div className="space-y-3">
+                      {chatLoading && (
+                        <div className="text-sm text-muted-foreground">Загрузка...</div>
+                      )}
+                      {!chatLoading && chats.length === 0 && (
+                        <div className="text-sm text-muted-foreground">
+                          Чатов пока нет.
+                        </div>
+                      )}
+                      {chats.map((chat) => {
+                        const model = models.find((item) => item.system_name === chat.model_name);
+                        return (
+                          <button
+                            key={chat.id}
+                            onClick={() => router.push(`/chats/${chat.id}`)}
+                            className="w-full rounded-lg border border-border/60 bg-card px-3 py-3 text-left transition hover:border-primary/60"
+                          >
+                            <div className="flex items-center gap-3">
+                              {model?.avatar_url ? (
+                                // eslint-disable-next-line @next/next/no-img-element
+                                <img
+                                  src={model.avatar_url}
+                                  alt={model.display_name}
+                                  className="h-10 w-10 rounded-full border"
+                                />
+                              ) : (
+                                <div className="h-10 w-10 rounded-full bg-muted" />
+                              )}
+                              <div>
+                                <div className="text-sm font-semibold">
+                                  {chat.title || 'Новый чат'}
+                                </div>
+                                <div className="text-xs text-muted-foreground">
+                                  {model?.display_name || chat.model_name || 'Модель не выбрана'}
+                                </div>
+                              </div>
+                            </div>
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </ScrollArea>
+                </CardContent>
+              </Card>
+            </aside>
 
-        {/* Vaults list */}
-        {!selectedFile && (
-          <div className="space-y-4">
-            <div>
-              <h2 className="text-xl font-semibold tracking-tight">
-                Загруженные хранилища
-              </h2>
-              <p className="text-sm text-muted-foreground mt-1">
-                Выберите хранилище для начала работы
-              </p>
-            </div>
-            <VaultsList vaults={vaults} onSelectVault={handleSelectVault} />
+            <main className="space-y-8">
+              {!selectedFile && (
+                <McpTokenCard
+                  tokenInfo={mcpToken}
+                  loading={mcpTokenLoading}
+                  error={mcpTokenError}
+                  isDemo={user?.is_demo ?? true}
+                  onRotate={handleRotateToken}
+                />
+              )}
+              {/* Drag overlay */}
+              {isDragging && (
+                <Card className="border-dashed border-2 border-primary bg-card/50 backdrop-blur">
+                  <CardContent className="flex flex-col items-center justify-center py-16">
+                    <FileArchive className="w-20 h-20 text-primary mb-4" />
+                    <p className="text-xl font-semibold">Отпустите файл для загрузки</p>
+                    <p className="text-sm text-muted-foreground mt-2">
+                      Принимаются только .zip файлы
+                    </p>
+                  </CardContent>
+                </Card>
+              )}
+
+              {/* Vaults list */}
+              {!selectedFile && (
+                <div className="space-y-4">
+                  <div>
+                    <h2 className="text-xl font-semibold tracking-tight">
+                      Загруженные хранилища
+                    </h2>
+                    <p className="text-sm text-muted-foreground mt-1">
+                      Выберите хранилище для начала работы
+                    </p>
+                  </div>
+                  <VaultsList vaults={vaults} onSelectVault={handleSelectVault} />
+                </div>
+              )}
+
+              {/* Empty state */}
+              {!isDragging && !selectedFile && vaults.length === 0 && (
+                <Card className="border-dashed border-2">
+                  <CardHeader className="text-center">
+                    <CardTitle className="text-2xl">Начните работу</CardTitle>
+                    <CardDescription className="text-base mt-2">
+                      Перетащите .zip файл с Obsidian vault на эту страницу или нажмите кнопку
+                      &quot;Загрузить Vault&quot;
+                    </CardDescription>
+                  </CardHeader>
+                  <CardContent className="flex justify-center py-12">
+                    <FileArchive className="w-32 h-32 text-muted-foreground/50" />
+                  </CardContent>
+                </Card>
+              )}
+            </main>
           </div>
-        )}
-
-        {/* Empty state */}
-        {!isDragging && !selectedFile && vaults.length === 0 && (
-          <Card className="border-dashed border-2">
-            <CardHeader className="text-center">
-              <CardTitle className="text-2xl">Начните работу</CardTitle>
-              <CardDescription className="text-base mt-2">
-                Перетащите .zip файл с Obsidian vault на эту страницу или нажмите кнопку
-                &quot;Загрузить Vault&quot;
-              </CardDescription>
-            </CardHeader>
-            <CardContent className="flex justify-center py-12">
-              <FileArchive className="w-32 h-32 text-muted-foreground/50" />
-            </CardContent>
-          </Card>
-        )}
         </div>
       </div>
     </>
