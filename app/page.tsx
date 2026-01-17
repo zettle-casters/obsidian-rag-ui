@@ -218,8 +218,6 @@ export default function Home() {
               </div>
             </div>
           </div>
-        </div>
-
         {/* Drag overlay */}
         {isDragging && (
           <Card className="border-dashed border-2 border-primary bg-card/50 backdrop-blur">
