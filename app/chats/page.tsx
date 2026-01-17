@@ -175,8 +175,8 @@ export default function ChatsPage() {
                       {modelBySystem.get(newModel)?.avatar_url ? (
                         // eslint-disable-next-line @next/next/no-img-element
                         <img
-                          src={modelBySystem.get(newModel)?.avatar_url}
-                          alt={modelBySystem.get(newModel)?.display_name}
+                          src={modelBySystem.get(newModel)?.avatar_url || ''}
+                          alt={modelBySystem.get(newModel)?.display_name || 'model'}
                           className="h-10 w-10 rounded-full border"
                         />
                       ) : (
